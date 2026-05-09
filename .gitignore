@@ -1,0 +1,6 @@
+
+.venv
+.qdrant_data
+.env
+ngrok.log
+
