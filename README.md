@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="https://img.shields.io/badge/DarpanAI-Cognitive%20Health%20Twin-00C9A7?style=for-the-badge&logo=heart&logoColor=white" alt="DarpanAI" height="45"/>
+<img src="https://raw.githubusercontent.com/TechWithAkash/HackArena-2.0/main/mobile/assets/logo.png" alt="DarpanAI Logo" width="120" height="120"/>
 
-# 🧬 DarpanAI — Cognitive Health Twin
+# DarpanAI — Cognitive Health Twin
 
 ### *Dynamic Analysis and Replica for Predicting Actionable Needs using AI*
 
