@@ -20,10 +20,6 @@ from backend.services.memory_service import _get_memory
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_db()
-    # Warm-load the DarpanEnsemble so first request is instant (~1.6s cold start)
-    await asyncio.to_thread(get_ensemble)
-    # Pre-warm mem0 BERT singleton — prevents 2-3s block on first chat/recommend request
-    await asyncio.to_thread(_get_memory)
     polling_task = asyncio.create_task(start_bot_polling())
     yield
     polling_task.cancel()
