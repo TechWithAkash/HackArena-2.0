@@ -142,13 +142,13 @@ export default function LandingPage() {
     show: { 
       clipPath: "inset(0 0% 0 0)", 
       y: 0, 
-      transition: { duration: 0.85, ease: [0.16, 1, 0.3, 1] } 
+      transition: { duration: 0.85, ease: [0.16, 1, 0.3, 1] as const } 
     }
   };
 
   const generalFadeUp = {
     hidden: { opacity: 0, y: 16 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+    show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" as const } }
   };
 
   return (
