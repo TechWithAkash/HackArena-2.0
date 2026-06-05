@@ -142,6 +142,13 @@ export interface MemoryResponse {
   memories: MemoryItem[];
 }
 
+export interface DocSession {
+  session_id: string;
+  filename: string;
+  chunk_count: number;
+  preview: string;
+}
+
 export interface UserProfile {
   user_id: string;
   age?: number | null;

@@ -1,5 +1,8 @@
 "use client";
 
+import { motion, AnimatePresence } from "framer-motion";
+import { CheckCircle2, ShieldAlert, Heart, Clock, ChevronRight } from "lucide-react";
+
 interface Alert {
   id: string;
   metric: string;
@@ -14,68 +17,98 @@ interface Props {
   onAcknowledge?: (id: string) => void;
 }
 
-const SEV_STYLES: Record<string, { bg: string; border: string; dot: string; label: string }> = {
-  critical: { bg: "bg-red-50",    border: "border-red-200",    dot: "bg-red-500",    label: "Critical" },
-  high:     { bg: "bg-orange-50", border: "border-orange-200", dot: "bg-orange-500", label: "High" },
-  medium:   { bg: "bg-yellow-50", border: "border-yellow-200", dot: "bg-yellow-400", label: "Medium" },
-  moderate: { bg: "bg-yellow-50", border: "border-yellow-200", dot: "bg-yellow-400", label: "Moderate" },
-  low:      { bg: "bg-[#ECFDF5]", border: "border-[#86EFAC]",  dot: "bg-[#22C55E]", label: "Low" },
+const SEV_STYLES: Record<string, { bg: string; border: string; text: string; dot: string; label: string }> = {
+  critical: { bg: "bg-danger/10",    border: "border-danger/25",    text: "text-danger",    dot: "bg-danger",    label: "Critical Alert" },
+  high:     { bg: "bg-danger/10",    border: "border-danger/20",    text: "text-danger",    dot: "bg-danger",    label: "High Severity" },
+  medium:   { bg: "bg-warning/10",   border: "border-warning/25",   text: "text-warning",   dot: "bg-warning",   label: "Medium Alert" },
+  moderate: { bg: "bg-warning/10",   border: "border-warning/20",   text: "text-warning",   dot: "bg-warning",   label: "Moderate Alert" },
+  low:      { bg: "bg-success/10", border: "border-success/25",  text: "text-success", dot: "bg-success", label: "Low Severity" },
 };
 
-const DEFAULT_STYLE = { bg: "bg-gray-50", border: "border-gray-200", dot: "bg-gray-400", label: "Info" };
+const DEFAULT_STYLE = { bg: "bg-bg-surface", border: "border-border-main", text: "text-text-secondary", dot: "bg-text-muted", label: "System Info" };
 
 export default function AlertBanner({ alerts, onAcknowledge }: Props) {
   if (!alerts || alerts.length === 0) {
     return (
-      <div className="bg-[#ECFDF5] border border-[#86EFAC] rounded-3xl p-6 flex items-center justify-between shadow-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-bg-surface border border-border-main rounded-[24px] p-6 flex items-center justify-between"
+      >
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-2xl bg-[#22C55E] flex items-center justify-center text-white">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+          <div className="w-10 h-10 rounded-xl bg-success/10 border border-success/20 flex items-center justify-center text-success">
+            <CheckCircle2 className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-sm font-bold text-gray-900">All Systems Clear</p>
-            <p className="text-xs text-gray-400">No anomalies detected in your recent health data.</p>
+            <p className="text-sm font-extrabold text-text-primary tracking-tight font-display">Physiological Balance Nominal</p>
+            <p className="text-xs text-text-secondary font-medium font-body">No critical exceptions or outliers detected by the anomaly layer.</p>
           </div>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
-      {alerts.map((alert) => {
-        const s = SEV_STYLES[alert.severity?.toLowerCase()] ?? DEFAULT_STYLE;
-        const label = alert.metric ?? "Unknown";
-        return (
-          <div key={alert.id} className={`${s.bg} border ${s.border} rounded-[2rem] p-5 flex items-center justify-between group transition-all hover:scale-[1.01] shadow-sm`}>
-            <div className="flex items-start gap-4">
-              <div className={`w-3 h-3 rounded-full ${s.dot} mt-1.5 animate-pulse`} />
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-bold text-gray-800 uppercase tracking-tight">{label.replace(/_/g, " ")}</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full bg-white border ${s.border} text-gray-600`}>{s.label}</span>
+      <AnimatePresence>
+        {alerts.map((alert, index) => {
+          const s = SEV_STYLES[alert.severity?.toLowerCase()] ?? DEFAULT_STYLE;
+          const label = alert.metric ?? "Telemetry";
+          return (
+            <motion.div 
+              key={alert.id}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 15 }}
+              transition={{ delay: index * 0.08, duration: 0.4 }}
+              className={`${s.bg} border ${s.border} rounded-[24px] p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 group transition-all`}
+            >
+              <div className="flex items-start gap-4">
+                <div className="relative shrink-0 mt-1">
+                  <span className={`w-3.5 h-3.5 rounded-full ${s.dot} block`} />
+                  <span className={`absolute inset-0 w-3.5 h-3.5 rounded-full ${s.dot} block animate-ping opacity-60`} />
                 </div>
-                <p className="text-sm text-gray-600 leading-relaxed max-w-lg">{alert.message}</p>
-                <div className="flex items-center gap-4 mt-2">
-                  <span className="text-[11px] font-medium text-gray-400">Observed: <span className="text-gray-600 font-bold">{alert.value}</span></span>
-                  {alert.timestamp && (
-                    <span className="text-[11px] font-medium text-gray-300 italic">{new Date(alert.timestamp).toLocaleTimeString()}</span>
-                  )}
+                
+                <div className="space-y-1.5 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-black text-text-primary uppercase tracking-wide font-display">
+                      {label.replace(/_/g, " ")}
+                    </span>
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${s.bg} ${s.text} ${s.border} font-mono`}>
+                      {s.label}
+                    </span>
+                  </div>
+                  
+                  <p className="text-xs text-text-secondary leading-relaxed font-medium max-w-xl font-body">
+                    {alert.message}
+                  </p>
+                  
+                  <div className="flex items-center gap-4 text-[10px] font-bold text-text-muted uppercase tracking-wider flex-wrap font-mono">
+                    <span className="flex items-center gap-1">
+                      Observed: <span className="text-text-primary font-black font-mono">{alert.value}</span>
+                    </span>
+                    {alert.timestamp && (
+                      <span className="flex items-center gap-1 text-text-secondary font-medium lowercase">
+                        <Clock className="w-3.5 h-3.5 text-text-muted" />
+                        {new Date(alert.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {onAcknowledge && (
-              <button
-                onClick={() => onAcknowledge(alert.id)}
-                className="opacity-0 group-hover:opacity-100 px-4 py-2 rounded-xl bg-white border border-gray-100 text-xs font-bold text-gray-400 hover:text-[#22C55E] hover:border-[#22C55E] transition-all shadow-sm"
-              >
-                Acknowledge
-              </button>
-            )}
-          </div>
-        );
-      })}
+              {onAcknowledge && (
+                <button
+                  onClick={() => onAcknowledge(alert.id)}
+                  className="w-full md:w-auto bg-bg-elevated hover:bg-border-hover border border-border-main text-text-primary hover:text-white rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer active:scale-95 text-center flex items-center justify-center gap-1 shrink-0"
+                >
+                  Clear Node <ChevronRight className="w-3 h-3 text-text-secondary" />
+                </button>
+              )}
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
     </div>
   );
 }

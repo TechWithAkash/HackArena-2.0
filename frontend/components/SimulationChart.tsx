@@ -5,11 +5,11 @@ import {
   Line,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { motion } from "framer-motion";
 
 interface Props {
   scenarios: { current: number[]; improved: number[]; optimal: number[] };
@@ -26,40 +26,93 @@ export default function SimulationChart({ scenarios, timelineDays, projectedRedu
   }));
 
   return (
-    <div className="w-full">
-      <div className="flex items-start justify-between mb-6">
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full space-y-6"
+    >
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Risk Simulation</p>
-          <p className="text-sm text-gray-500 mt-0.5">Projected trajectories over 120 days</p>
+          <span className="text-[10px] font-bold text-success uppercase tracking-wider font-mono">
+            ● TRAJECTORY DYNAMICS
+          </span>
+          <h3 className="text-xl font-semibold text-white tracking-tight font-display mt-1">Prakriti Trajectory Simulation</h3>
         </div>
-        <div className="flex gap-3">
-          <div className="text-right">
-            <p className="text-xs text-gray-400">Improved path</p>
-            <p className="text-sm font-semibold text-[#22C55E]">−{projectedReduction.improved.toFixed(1)}%</p>
+        
+        <div className="flex gap-4 bg-bg-elevated border border-border-main rounded-lg px-4.5 py-2.5 text-[11px] font-mono text-text-secondary uppercase">
+          <div>
+            <p className="text-text-muted">Improved Path</p>
+            <p className="text-[13px] font-semibold text-primary">−{projectedReduction.improved.toFixed(1)}%</p>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-gray-400">Optimal path</p>
-            <p className="text-sm font-semibold text-[#16A34A]">−{projectedReduction.optimal.toFixed(1)}%</p>
+          <div className="border-l border-border-main" />
+          <div>
+            <p className="text-text-muted">Optimal Path</p>
+            <p className="text-[13px] font-semibold text-success">−{projectedReduction.optimal.toFixed(1)}%</p>
           </div>
         </div>
       </div>
-      <ResponsiveContainer width="100%" height={350}>
-        <LineChart data={data} margin={{ top: 20, right: 8, left: -20, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-          <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} domain={[0, 100]} />
-          <Tooltip
-            contentStyle={{ borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", fontSize: 12 }}
-          />
-          <Legend
-            wrapperStyle={{ fontSize: 12, paddingTop: 16 }}
-            formatter={(v) => <span style={{ color: "#6B7280" }}>{v}</span>}
-          />
-          <Line type="monotone" dataKey="Current" stroke="#D1D5DB" strokeWidth={2} dot={false} />
-          <Line type="monotone" dataKey="Improved" stroke="#86EFAC" strokeWidth={2.5} dot={false} />
-          <Line type="monotone" dataKey="Optimal" stroke="#22C55E" strokeWidth={2.5} dot={false} />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
+
+      <div className="h-[320px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+            <XAxis 
+              dataKey="day" 
+              tick={{ fontSize: 10, fill: "#8B92A5", fontFamily: "IBM Plex Mono" }} 
+              axisLine={false} 
+              tickLine={false} 
+            />
+            <YAxis 
+              tick={{ fontSize: 10, fill: "#8B92A5", fontFamily: "IBM Plex Mono" }} 
+              axisLine={false} 
+              tickLine={false} 
+              domain={[0, 100]} 
+            />
+            <Tooltip
+              contentStyle={{ 
+                borderRadius: '8px', 
+                background: '#181C24',
+                border: '1px solid #1E2330', 
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)', 
+                fontSize: '11px', 
+                fontFamily: 'IBM Plex Mono',
+                color: '#F0F2F7'
+              }}
+              itemStyle={{ color: '#F0F2F7' }}
+              labelStyle={{ color: '#8B92A5', marginBottom: '4px' }}
+              formatter={(value, name) => [`${value}%`, name]}
+            />
+            <Legend
+              wrapperStyle={{ fontSize: 10, fontFamily: "IBM Plex Mono", paddingTop: 16, textTransform: "uppercase", letterSpacing: "0.05em" }}
+              formatter={(v) => <span style={{ color: "#8B92A5" }}>{v}</span>}
+            />
+            <Line 
+              type="monotone" 
+              dataKey="Current" 
+              stroke="#4A5168" 
+              strokeWidth={2} 
+              strokeDasharray="4 4"
+              dot={false} 
+              name="Current Path"
+            />
+            <Line 
+              type="monotone" 
+              dataKey="Improved" 
+              stroke="#4F8EF7" 
+              strokeWidth={2.5} 
+              dot={false} 
+              name="Improved Path"
+            />
+            <Line 
+              type="monotone" 
+              dataKey="Optimal" 
+              stroke="#00D4A0" 
+              strokeWidth={3.2} 
+              dot={false} 
+              name="Optimal Path"
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </motion.div>
   );
 }

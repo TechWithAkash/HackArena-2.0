@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  Paperclip, Send, AlertTriangle, FileText, Heart, Moon, Zap, 
+  Lightbulb, RefreshCw, Activity, ArrowUpRight, Cpu 
+} from "lucide-react";
+import { api, type DocSession, type HealthDataInput } from "@/lib/api";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -9,13 +15,6 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   streaming?: boolean;
-}
-
-interface DocSession {
-  session_id: string;
-  filename: string;
-  chunk_count: number;
-  preview: string;
 }
 
 const INITIAL_CHIPS = [
@@ -35,7 +34,13 @@ const DOC_CHIPS = [
 const WELCOME_MSG: Message = {
   id: "welcome",
   role: "assistant",
-  content: `**Hello, I'm Darpan** — your Cognitive Health Twin.\n\nI have full access to your health profile including your risk score, SHAP explainability data, causal analysis, and 120-day simulation projections.\n\nYou can also **upload a blood report or any medical document** (PDF, image) and I'll answer questions directly from it.\n\nAsk me anything about your health data — I'll give you specific, data-driven answers.`,
+  content: `**Hello, I'm Darpan** — your Cognitive Health Twin.
+
+I have access to your health profile including risk scores, SHAP values, causal relationships, and simulation projections.
+
+You can also **upload any clinical document** (PDF, image, text) and I will extract findings directly, cross-referencing with your live baseline telemetry.
+
+Ask me anything about your parameters.`,
 };
 
 const ACCEPTED_TYPES = ".pdf,.txt,.md,.png,.jpg,.jpeg,.webp,.csv";
@@ -50,6 +55,8 @@ export default function ChatPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [vitals, setVitals] = useState<HealthDataInput | null>(null);
+  const [inputFocused, setInputFocused] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -59,13 +66,16 @@ export default function ChatPage() {
   useEffect(() => {
     const uid = sessionStorage.getItem("darpan_user_id") ?? "user_demo_001";
     setUserId(uid);
+
+    api.getLatestHealth(uid)
+      .then(setVitals)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // ── Document upload ──────────────────────────────────────────────────────
   async function handleUpload(file: File) {
     if (!file || !userId) return;
     setUploading(true);
@@ -87,11 +97,10 @@ export default function ChatPage() {
       setDocSession(data);
       setChips(DOC_CHIPS);
 
-      // Add system message showing doc loaded
       const sysMsg: Message = {
         id: `doc-${Date.now()}`,
         role: "assistant",
-        content: `📄 **Document loaded: ${data.filename}**\n\nI've read and indexed ${data.chunk_count} sections from your document. You can now ask me anything about it — I'll answer directly from the content and cross-reference it with your health profile.\n\n_Preview: ${data.preview.slice(0, 180)}${data.preview.length > 180 ? "..." : ""}_`,
+        content: `📄 **Document loaded: ${data.filename}**\n\nI've read and indexed ${data.chunk_count} sections. You can now ask questions about the document, and I'll cross-reference it with your live health profile.\n\n_Preview: ${data.preview.slice(0, 150)}..._`,
       };
       setMessages((prev) => [...prev, sysMsg]);
     } catch (err: any) {
@@ -132,7 +141,6 @@ export default function ChatPage() {
     if (file) handleUpload(file);
   }
 
-  // ── Chat ─────────────────────────────────────────────────────────────────
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim() || isStreaming || !userId) return;
@@ -231,27 +239,11 @@ export default function ChatPage() {
 
   return (
     <div
-      className="flex flex-col h-[100dvh] max-w-4xl mx-auto"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      className="max-w-7xl mx-auto pb-6 relative h-[calc(100vh-80px)] flex flex-col lg:flex-row gap-6 items-stretch"
     >
-      {/* Drag-over overlay */}
-      {dragOver && (
-        <div className="absolute inset-0 z-50 bg-indigo-600/10 backdrop-blur-sm border-2 border-dashed border-indigo-400 rounded-2xl flex items-center justify-center pointer-events-none">
-          <div className="text-center">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-100 flex items-center justify-center mx-auto mb-3">
-              <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-            </div>
-            <p className="text-indigo-700 font-bold text-base">Drop your medical document</p>
-            <p className="text-indigo-500 text-sm mt-1">PDF, image, or text file</p>
-          </div>
-        </div>
-      )}
-
-      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -260,199 +252,215 @@ export default function ChatPage() {
         onChange={handleFileInput}
       />
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="shrink-0 px-6 pt-8 pb-4">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-200">
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-lg font-extrabold text-gray-900 tracking-tight">Darpan AI</h1>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Cognitive Health Twin · Document RAG · Groq</p>
-          </div>
-          <div className="ml-auto flex items-center gap-3">
-            {/* Document upload button */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading || isStreaming}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                docSession
-                  ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
-                  : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700"
-              } disabled:opacity-40`}
-            >
-              {uploading ? (
-                <>
-                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Analysing…
-                </>
-              ) : (
-                <>
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  {docSession ? "Replace doc" : "Upload report"}
-                </>
-              )}
-            </button>
-
-            {/* Live indicator */}
-            <span className="flex items-center gap-1.5">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-              </span>
-              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Live</span>
-            </span>
-          </div>
-        </div>
-
-        {/* Document pill */}
-        {docSession && (
-          <div className="flex items-center gap-3 bg-gradient-to-r from-indigo-50 to-violet-50 border border-indigo-100 rounded-2xl px-4 py-2.5">
-            <div className="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
-              <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-indigo-900 truncate">{docSession.filename}</p>
-              <p className="text-[10px] text-indigo-500 font-medium">{docSession.chunk_count} sections indexed · RAG active</p>
-            </div>
-            <button
-              onClick={handleRemoveDoc}
-              className="w-6 h-6 rounded-lg bg-indigo-100 hover:bg-indigo-200 flex items-center justify-center transition-colors shrink-0"
-            >
-              <svg className="w-3 h-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        )}
-
-        {/* Upload error */}
-        {uploadError && (
-          <div className="mt-2 flex items-center gap-2 bg-red-50 border border-red-100 rounded-xl px-4 py-2">
-            <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p className="text-xs text-red-700 font-medium">{uploadError}</p>
-            <button onClick={() => setUploadError(null)} className="ml-auto text-red-400 hover:text-red-600">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* ── Messages ─────────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-6 space-y-4 pb-2">
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
-        ))}
-
-        <div ref={bottomRef} />
-      </div>
-
-      {/* ── Chips ─────────────────────────────────────────────────────────────── */}
-      {!isStreaming && (
-        <div className="shrink-0 px-6 pb-2">
-          <div className="flex flex-wrap gap-2">
-            {chips.map((chip, i) => (
-              <button
-                key={i}
-                onClick={() => sendMessage(chip)}
-                className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 px-3 py-1.5 rounded-full hover:bg-indigo-100 hover:border-indigo-200 transition-all active:scale-95"
-              >
-                {chip}
-              </button>
-            ))}
+      {/* Drag-over overlay */}
+      {dragOver && (
+        <div className="absolute inset-0 z-50 bg-[#4F8EF7]/10 backdrop-blur-sm border-2 border-dashed border-[#4F8EF7] rounded-xl flex items-center justify-center pointer-events-none">
+          <div className="text-center space-y-2">
+            <FileText className="w-12 h-12 text-[#4F8EF7] mx-auto animate-bounce" />
+            <p className="text-white font-bold text-sm uppercase tracking-wider font-display">Drop medical document here</p>
+            <p className="text-text-secondary text-xs font-mono">PDF, Image, or CSV data sheet</p>
           </div>
         </div>
       )}
 
-      {/* ── Input ─────────────────────────────────────────────────────────────── */}
-      <div className="shrink-0 px-6 pb-6 pt-2">
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm hover:border-indigo-200 focus-within:border-indigo-300 focus-within:shadow-md transition-all flex items-end gap-3 p-3">
-          {/* Paperclip / attach button */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading || isStreaming}
-            title="Upload medical document"
-            className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all ${
-              docSession
-                ? "bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100"
-                : "bg-gray-50 text-gray-400 border border-gray-100 hover:bg-indigo-50 hover:text-indigo-500 hover:border-indigo-200"
-            } disabled:opacity-40`}
-          >
-            {uploading ? (
-              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
+      {/* Left Column: Chat Conversation */}
+      <div className="flex-1 bg-bg-surface border border-border-main rounded-xl flex flex-col overflow-hidden h-full">
+        
+        {/* Chat Header */}
+        <div className="p-4 border-b border-border-main/50 flex items-center justify-between shrink-0 bg-[#0D0F15]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#8B5CF6] to-[#4F8EF7] flex items-center justify-center text-white shadow-sm shrink-0">
+              <Lightbulb size={18} />
+            </div>
+            <div>
+              <h2 className="text-[16px] font-semibold text-white font-display">Darpan AI</h2>
+              <p className="text-[10px] text-text-secondary font-mono uppercase tracking-wider">
+                COGNITIVE HEALTH TWIN · DOCUMENT RAG · GROQ
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading || isStreaming}
+              className="px-3 h-8 bg-transparent hover:bg-bg-elevated border border-border-main text-white text-[12px] font-medium rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              {uploading ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <span className="text-[12px]">Upload report ↑</span>
+              )}
+            </button>
+            
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#00D4A0]/10 border border-[#00D4A0]/20 text-[#00D4A0] text-[9px] font-mono uppercase tracking-wider font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-success live-dot" /> Live
+            </span>
+          </div>
+        </div>
+
+        {/* Messages list */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-6 bg-[#0A0C10]/40">
+          {messages.map((msg) => (
+            <MessageBubble key={msg.id} message={msg} />
+          ))}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Upload error banner if any */}
+        {uploadError && (
+          <div className="px-5 py-3 bg-danger/10 border-t border-danger/20 flex items-center gap-2 text-danger text-[10px] font-bold uppercase tracking-wider font-mono">
+            <AlertTriangle className="w-4 h-4 text-danger shrink-0" />
+            <span>{uploadError}</span>
+            <button onClick={() => setUploadError(null)} className="ml-auto text-text-muted hover:text-white font-black">Dismiss</button>
+          </div>
+        )}
+
+        {/* Suggestion Chips */}
+        {!isStreaming && (
+          <div className="px-5 py-3 border-t border-border-main/40 overflow-x-auto shrink-0 bg-[#0D0F15] scrollbar-none">
+            <div className="flex gap-2">
+              {chips.map((chip, i) => (
+                <button
+                  key={i}
+                  onClick={() => sendMessage(chip)}
+                  className="h-[34px] px-4 rounded-full bg-[#181C24] border border-[#1E2330] hover:border-[#4F8EF7] text-text-secondary hover:text-white text-[13px] font-body transition-colors cursor-pointer whitespace-nowrap active:scale-95"
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Chat Input Console */}
+        <div className="p-4 border-t border-border-main/50 bg-[#0D0F15] shrink-0 space-y-3">
+          <div className="bg-[#181C24] border border-[#1E2330] rounded-xl h-[52px] px-3.5 flex items-center gap-3 focus-within:border-[#4F8EF7]/55 transition-colors">
+            <Paperclip 
+              size={16} 
+              className="text-text-muted cursor-pointer hover:text-white transition-colors"
+              onClick={() => fileInputRef.current?.click()}
+            />
+            
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
+              placeholder="Ask about your health data..."
+              rows={1}
+              disabled={isStreaming}
+              className="flex-1 resize-none bg-transparent text-[14px] font-body text-white placeholder-text-muted outline-none max-h-12 py-3 disabled:opacity-50"
+            />
+
+            {isStreaming ? (
+              <button
+                onClick={handleStop}
+                className="w-9 h-9 rounded-full bg-danger/10 border border-danger/20 text-danger flex items-center justify-center hover:bg-danger/20 transition-all cursor-pointer shrink-0"
+              >
+                <div className="w-3 h-3 bg-danger rounded-sm" />
+              </button>
             ) : (
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-              </svg>
+              <AnimatePresence>
+                {(input.trim() || inputFocused) && (
+                  <motion.button
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    onClick={() => sendMessage(input)}
+                    disabled={!input.trim()}
+                    className="w-9 h-9 rounded-full bg-[#4F8EF7] hover:brightness-110 disabled:opacity-30 text-white flex items-center justify-center transition-all cursor-pointer shrink-0"
+                  >
+                    <Send size={14} />
+                  </motion.button>
+                )}
+              </AnimatePresence>
             )}
-          </button>
+          </div>
 
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={docSession ? `Ask about ${docSession.filename}…` : "Ask about your health data…"}
-            rows={1}
-            disabled={isStreaming}
-            className="flex-1 resize-none bg-transparent text-sm text-gray-800 placeholder:text-gray-400 outline-none font-medium leading-relaxed max-h-32 disabled:opacity-50"
-            style={{ fieldSizing: "content" } as any}
-          />
-
-          {isStreaming ? (
-            <button
-              onClick={handleStop}
-              className="w-9 h-9 rounded-xl bg-red-50 border border-red-100 text-red-500 flex items-center justify-center hover:bg-red-100 transition-colors shrink-0"
-            >
-              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                <rect x="6" y="6" width="12" height="12" rx="2" />
-              </svg>
-            </button>
-          ) : (
-            <button
-              onClick={() => sendMessage(input)}
-              disabled={!input.trim()}
-              className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed shrink-0 shadow-sm"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-              </svg>
-            </button>
-          )}
+          <div className="flex items-start gap-2.5 bg-[#F5A623]/5 border-l-[3px] border-l-[#F5A623] rounded-md px-3.5 py-2.5">
+            <AlertTriangle size={16} className="text-[#F5A623] shrink-0 mt-0.5" />
+            <p className="text-[11px] text-[#8B92A5] font-body leading-relaxed">
+              Medical Disclaimer: DarpanAI answers are informational and not diagnostic health treatments. Always verify predictions with professionals.
+            </p>
+          </div>
         </div>
 
-
-        {/* Medical Disclaimer */}
-        <div className="mt-3 flex items-start gap-2.5 bg-amber-50/70 border border-amber-100 rounded-xl px-4 py-2.5">
-          <svg className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-[1px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-          </svg>
-          <p className="text-[10px] text-amber-700/80 font-medium leading-relaxed">
-            <span className="font-bold text-amber-800">Medical Disclaimer:</span> DarpanAI provides AI-generated health insights for informational purposes only. Outputs may contain inaccuracies and do not constitute medical advice, diagnosis, or treatment. Always consult a qualified healthcare professional before making any clinical or lifestyle decisions.
-          </p>
-        </div>
       </div>
+
+      {/* Right Column: Digital Twin Context Summary */}
+      <div className="w-full lg:w-80 bg-bg-surface border border-border-main rounded-xl p-5 flex flex-col gap-5 shrink-0 h-full overflow-y-auto shadow-[0_0_24px_rgba(0,0,0,0.3)]">
+        <div>
+          <span className="text-[10px] font-bold text-success uppercase tracking-wider font-mono flex items-center gap-1.5 mb-1">
+            <Cpu className="w-3.5 h-3.5 text-primary" />
+            Twin Parameters
+          </span>
+          <h4 className="text-sm font-semibold text-white font-display">Active Context</h4>
+        </div>
+
+        {/* Vitals Summary logs */}
+        {vitals ? (
+          <div className="space-y-4">
+            <div className="bg-[#181C24] border border-border-main rounded-lg p-3.5 space-y-3 font-mono">
+              <span className="text-[9px] font-bold text-text-muted uppercase tracking-widest block border-b border-border-main/50 pb-2">
+                Biometric Telemetry
+              </span>
+              {[
+                { label: "Heart Rate", val: Math.round(vitals.heart_rate), unit: "bpm", icon: Heart, color: "text-danger" },
+                { label: "Sleep", val: Number(vitals.sleep.toFixed(1)), unit: "hrs", icon: Moon, color: "text-primary" },
+                { label: "Steps", val: Math.round(vitals.steps).toLocaleString(), unit: "steps", icon: Activity, color: "text-success" },
+                { label: "Stress Level", val: vitals.stress_level, unit: "/10", icon: Zap, color: "text-warning" },
+              ].map(({ label, val, unit, icon: Icon, color }) => (
+                <div key={label} className="flex justify-between items-center text-xs">
+                  <span className="text-text-secondary flex items-center gap-1.5">
+                    <Icon className={`w-3.5 h-3.5 ${color}`} /> {label}
+                  </span>
+                  <span className="text-white font-semibold">{val} <span className="text-[10px] text-text-muted">{unit}</span></span>
+                </div>
+              ))}
+            </div>
+
+            {docSession ? (
+              <div className="bg-[#00D4A0]/5 border border-[#00D4A0]/20 text-white rounded-lg p-3.5 space-y-2">
+                <span className="text-[9px] font-bold text-success uppercase tracking-widest block border-b border-[#00D4A0]/10 pb-2 font-mono">
+                  Document RAG Indexed
+                </span>
+                <div className="flex items-start gap-2 text-xs">
+                  <FileText className="w-4 h-4 text-success shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold truncate max-w-[180px]">{docSession.filename}</p>
+                    <p className="text-[10px] text-success mt-1 font-mono">{docSession.chunk_count} Sections Loaded</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={handleRemoveDoc}
+                  className="w-full mt-2 bg-success hover:brightness-110 text-[#0A0C10] rounded-lg py-2 text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer font-mono"
+                >
+                  Detach Document
+                </button>
+              </div>
+            ) : (
+              <div className="bg-[#181C24]/50 border border-border-main rounded-lg p-4 text-center py-6 space-y-2.5">
+                <FileText className="w-7 h-7 text-text-muted mx-auto" />
+                <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider font-mono">No Document Linked</p>
+                <p className="text-[9px] text-text-muted leading-relaxed font-body">Drag medical files onto the chat to augment agent memory context.</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-text-secondary text-xs font-mono">
+            No Baseline Telemetry
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
 
-// ── Message Bubble ────────────────────────────────────────────────────────────
+// ── Message Bubble ──
 
 function MessageBubble({ message }: { message: Message }) {
   const isUser = message.role === "user";
@@ -460,34 +468,34 @@ function MessageBubble({ message }: { message: Message }) {
   if (isUser) {
     return (
       <div className="flex justify-end animate-in fade-in slide-in-from-bottom-2 duration-300">
-        <div className="max-w-[75%] bg-indigo-600 text-white rounded-2xl rounded-br-md px-4 py-3 shadow-sm">
-          <p className="text-sm font-medium leading-relaxed">{message.content}</p>
+        <div 
+          className="max-w-[75%] bg-[#4F8EF7] text-white p-3.5 shadow-md font-body text-[14px]"
+          style={{ borderRadius: "16px 16px 4px 16px" }}
+        >
+          <p className="leading-relaxed">{message.content}</p>
         </div>
       </div>
     );
   }
 
-  // While content is empty and still streaming → show dots inside the bubble
   const isThinking = message.streaming && !message.content;
 
   return (
-    <div className="flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shrink-0 mt-0.5 shadow-sm shadow-indigo-200">
-        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-        </svg>
+    <div className="flex items-start gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300 w-full">
+      <div className="w-8 h-8 rounded-full bg-[#8B5CF6] flex items-center justify-center text-white shrink-0 mt-1 shadow-sm">
+        <Lightbulb size={15} />
       </div>
-      <div className="max-w-[80%]">
-        <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-md px-4 py-3 shadow-sm min-w-[80px]">
+      <div className="flex-1">
+        <div className="bg-[#111318] border border-border-main border-l-[3px] border-l-[#00D4A0] rounded-lg p-5 shadow-sm space-y-2.5">
+          <div className="text-[15px] font-display text-white">
+            Hello, I'm <span className="font-semibold text-[#00D4A0]">Darpan</span>
+          </div>
+
           {isThinking ? (
-            <div className="flex items-center gap-2">
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"
-                  style={{ animationDelay: `${i * 150}ms` }}
-                />
-              ))}
+            <div className="flex items-center gap-1.5 py-1.5">
+              <span className="w-1.5 h-1.5 bg-[#00D4A0] rounded-full animate-bounce" />
+              <span className="w-1.5 h-1.5 bg-[#00D4A0] rounded-full animate-bounce [animation-delay:0.15s]" />
+              <span className="w-1.5 h-1.5 bg-[#00D4A0] rounded-full animate-bounce [animation-delay:0.3s]" />
             </div>
           ) : (
             <MarkdownText text={message.content} streaming={message.streaming} />
@@ -501,25 +509,27 @@ function MessageBubble({ message }: { message: Message }) {
 function MarkdownText({ text, streaming }: { text: string; streaming?: boolean }) {
   if (!text) return null;
   const lines = text.split("\n");
+  
   return (
-    <div className="text-sm text-gray-700 leading-relaxed space-y-1.5 font-medium">
+    <div className="text-[14px] text-text-secondary leading-[1.7] space-y-2.5 font-body">
       {lines.map((line, i) => {
         if (!line.trim()) return <div key={i} className="h-1" />;
+        
         if (line.trim().startsWith("• ") || line.trim().startsWith("- ")) {
           return (
-            <div key={i} className="flex items-start gap-2">
-              <span className="w-1 h-1 bg-indigo-400 rounded-full shrink-0 mt-2" />
+            <div key={i} className="flex items-start gap-2.5 ml-2.5">
+              <span className="w-1.5 h-1.5 bg-[#00D4A0] rounded-full shrink-0 mt-2" />
               <span>{renderInline(line.replace(/^[•\-]\s*/, ""))}</span>
             </div>
           );
         }
         if (line.trim().startsWith("_") && line.trim().endsWith("_")) {
-          return <p key={i} className="text-xs text-gray-400 italic">{line.trim().slice(1, -1)}</p>;
+          return <p key={i} className="text-[10px] text-text-muted italic tracking-tight font-mono">{line.trim().slice(1, -1)}</p>;
         }
         return <p key={i}>{renderInline(line)}</p>;
       })}
       {streaming && (
-        <span className="inline-block w-1.5 h-4 bg-indigo-500 rounded-sm animate-pulse ml-0.5 align-middle" />
+        <span className="inline-block w-1.5 h-4 bg-primary rounded-sm animate-pulse ml-0.5 align-middle" />
       )}
     </div>
   );
@@ -529,7 +539,11 @@ function renderInline(text: string): React.ReactNode {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
   return parts.map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={i} className="font-bold text-gray-900">{part.slice(2, -2)}</strong>;
+      return <strong key={i} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
+    }
+    // Highlight RAG links or actions if bolded in primary color
+    if (part.includes("upload") || part.includes("Upload")) {
+      return <span key={i} className="text-[#4F8EF7] font-semibold">{part}</span>;
     }
     return part;
   });

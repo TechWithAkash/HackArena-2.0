@@ -1,6 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
+import { motion } from "framer-motion";
+import { GitBranch } from "lucide-react";
 
 interface Node {
   id: string;
@@ -44,13 +46,15 @@ const EDGES: Edge[] = [
 interface Props {
   primaryCause?: string;
   causalChain?: string;
+  shapContributions?: Record<string, number>;
 }
 
-export default function CausalMap({ primaryCause, causalChain }: Props) {
+export default function CausalMap({ primaryCause, causalChain, shapContributions }: Props) {
+  const [hoveredNode, setHoveredNode] = useState<Node | null>(null);
+
   const chainNodes = causalChain
     ? causalChain.split(" → ").flatMap((seg) => seg.split(" & "))
     : [];
-  
 
   const isEdgeInChain = (source: string, target: string) => {
     if (primaryCause && source === primaryCause) return true;
@@ -58,134 +62,188 @@ export default function CausalMap({ primaryCause, causalChain }: Props) {
     return chainNodes.includes(source) && chainNodes.includes(target);
   };
 
-  // All nodes directly targeted by the primary cause
   const directTargets = new Set(
     primaryCause
       ? EDGES.filter(e => e.source === primaryCause).map(e => e.target)
       : []
   );
 
-  const getNodeColor = (id: string) => {
-    if (id === primaryCause) return "#22C55E";           // vivid green — root cause
-    if (directTargets.has(id)) return "#FDE68A";        // amber tint — direct mediator
-    if (chainNodes.includes(id)) return "#BBF7D0";      // light green — chain node
-    return "#F3F4F6";                                   // grey — inactive
+  const getNodeFillColor = (id: string) => {
+    if (id === "risk_score") return "#E5534B"; // Terminal Node (Health Risk)
+    if (id === primaryCause) return "#00D4A0"; // Root Cause (Teal)
+    if (directTargets.has(id)) return "#F5A623"; // Mediator Node (Amber)
+    return "#111318"; // Inactive/Other Node
   };
 
-  const getNodeStroke = (id: string) => {
-    if (id === primaryCause) return "#16A34A";
-    if (directTargets.has(id)) return "#F59E0B";
-    if (chainNodes.includes(id)) return "#22C55E";
-    return "#E5E7EB";
+  const getNodeStrokeColor = (id: string) => {
+    if (id === "risk_score") return "#E5534B";
+    if (id === primaryCause) return "#00D4A0";
+    if (directTargets.has(id)) return "#F5A623";
+    return "#1E2330";
   };
 
-  const getTextFill = (id: string) => {
-    if (id === primaryCause || directTargets.has(id) || chainNodes.includes(id)) return "#111827";
-    return "#9CA3AF";
+  const getLabelColor = (id: string) => {
+    if (id === "risk_score") return "text-[#E5534B]";
+    if (id === primaryCause) return "text-[#00D4A0]";
+    if (directTargets.has(id)) return "text-[#F5A623]";
+    return "text-[#8B92A5]";
   };
 
   return (
-    <div className="w-full bg-white rounded-[2.5rem] border border-gray-100 p-8 shadow-xl shadow-gray-200/50 overflow-hidden">
-      <div className="flex justify-between items-center mb-6">
+    <motion.div 
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="w-full bg-[#111318] rounded-xl border border-border-main p-6 md:p-8 overflow-hidden relative shadow-[0_0_24px_rgba(0,0,0,0.4)]"
+    >
+      {/* Schematic grid background in dark theme */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1E2330_1px,transparent_1px),linear-gradient(to_bottom,#1E2330_1px,transparent_1px)] bg-[size:32px_32px] opacity-40 pointer-events-none" />
+
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 relative z-10">
         <div>
-          <h3 className="text-sm font-bold text-gray-900 uppercase tracking-tight">Causal Relationship Map</h3>
-          <p className="text-[11px] text-gray-400 mt-0.5">How Aura identifies root causes from physiological drivers</p>
+          <span className="text-[10px] font-bold text-success uppercase tracking-wider font-mono">
+            ● LIVE CAUSAL RELATIONSHIP MATRIX ACTIVE
+          </span>
+          <h3 className="text-xl font-semibold text-white tracking-tight font-display mt-1">Causal Relationship Map</h3>
         </div>
-        <div className="flex gap-4">
-          <LegendItem color="#22C55E" label="Root Cause" />
-          <LegendItem color="#F59E0B" label="Mediator" />
+        
+        <div className="flex flex-wrap gap-4 bg-[#181C24] border border-border-main rounded-lg px-4 py-2 text-[10px] font-bold uppercase tracking-wider font-mono">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-[#00D4A0]" />
+            <span className="text-white">Root Cause</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-[#F5A623]" />
+            <span className="text-white">Mediator</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-[#E5534B]" />
+            <span className="text-white">Terminal</span>
+          </div>
         </div>
       </div>
 
-      <div className="relative aspect-[720/300] w-full">
-        <svg viewBox="0 0 720 300" className="w-full h-full preserve-3d">
+      <div className="relative aspect-[720/300] w-full border border-border-main rounded-lg bg-[#0A0C10]/60 backdrop-blur-[2px] z-10">
+        <svg viewBox="0 0 720 300" className="w-full h-full">
           <style dangerouslySetInnerHTML={{__html: `
-            @keyframes dataFlow {
-              to { stroke-dashoffset: -20; }
+            @keyframes flowAnim {
+              to { stroke-dashoffset: -24; }
             }
-            .path-flow {
-              stroke-dasharray: 6 6;
-              animation: dataFlow 0.8s linear infinite;
+            .flow-line {
+              stroke-dasharray: 8 6;
+              animation: flowAnim 1.2s linear infinite;
             }
           `}} />
-          {/* Defs for arrows */}
           <defs>
             <marker id="arrow" viewBox="0 0 10 10" refX="28" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#D1D5DB" />
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#1E2330" />
             </marker>
             <marker id="arrow-active" viewBox="0 0 10 10" refX="28" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#F59E0B" />
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#F5A623" />
             </marker>
           </defs>
 
-          {/* Edges */}
+          {/* Connectors / Edges */}
           {EDGES.map((edge) => {
             const s = NODES.find(n => n.id === edge.source)!;
             const t = NODES.find(n => n.id === edge.target)!;
             const active = isEdgeInChain(edge.source, edge.target);
 
             return (
-              <line
-                key={`${edge.source}-${edge.target}`}
-                x1={s.x} y1={s.y} x2={t.x} y2={t.y}
-                stroke={active ? "#F59E0B" : "#D1D5DB"}
-                strokeWidth={active ? 2.5 : 1.5}
-                strokeDasharray={active ? "6 4" : undefined}
-                markerEnd={`url(#${active ? "arrow-active" : "arrow"})`}
-                style={active ? { animation: "dataFlow 0.8s linear infinite" } : undefined}
-              />
+              <g key={`${edge.source}-${edge.target}`}>
+                <line
+                  x1={s.x} y1={s.y} x2={t.x} y2={t.y}
+                  stroke={active ? "#F5A623" : "#1E2330"}
+                  strokeWidth={active ? 2.5 : 1.5}
+                  markerEnd={`url(#${active ? "arrow-active" : "arrow"})`}
+                  className={active ? "flow-line" : ""}
+                />
+              </g>
             );
           })}
 
-          {/* Nodes */}
+          {/* Node objects */}
           {NODES.map((node) => {
-            const isActive = chainNodes.includes(node.id) || directTargets.has(node.id);
             const isPrimary = node.id === primaryCause;
+            const isTargetNode = node.id === "risk_score";
+            const isMediator = directTargets.has(node.id);
+            
+            const fill = getNodeFillColor(node.id);
+            const stroke = getNodeStrokeColor(node.id);
 
             return (
-              <g key={node.id} className="cursor-default select-none">
-                {/* Glow ring */}
-                {(isActive || isPrimary) && (
+              <g 
+                key={node.id} 
+                className="group cursor-pointer select-none"
+                onMouseEnter={() => setHoveredNode(node)}
+                onMouseLeave={() => setHoveredNode(null)}
+              >
+                {/* Glow ring on hover/active */}
+                {(isPrimary || isMediator || isTargetNode) && (
                   <circle
-                    cx={node.x} cy={node.y} r={30}
-                    fill={isPrimary ? "#22C55E" : "#F59E0B"}
-                    fillOpacity={0.15}
+                    cx={node.x} cy={node.y} r={32}
+                    fill={fill}
+                    fillOpacity={0.05}
+                    className="animate-pulse"
                   />
                 )}
 
-                {/* Main node circle */}
+                {/* Main Node circle */}
                 <circle
-                  cx={node.x} cy={node.y} r={24}
-                  fill={getNodeColor(node.id)}
-                  stroke={getNodeStroke(node.id)}
-                  strokeWidth={isPrimary || isActive ? 2 : 1}
+                  cx={node.x} cy={node.y} r={22}
+                  fill={fill}
+                  stroke={stroke}
+                  strokeWidth={isPrimary || isMediator || isTargetNode ? 2.5 : 1.5}
+                  className="transition-all duration-300 group-hover:scale-105 shadow-[0_0_12px_rgba(0,0,0,0.5)]"
                 />
 
-                {/* Label */}
-                <text
-                  x={node.x} y={node.y + 42}
-                  textAnchor="middle"
-                  fontSize="9"
-                  fontWeight="700"
-                  letterSpacing="0.08em"
-                  fill={getTextFill(node.id)}
+                {/* Micro icon marker inside circle */}
+                <circle
+                  cx={node.x} cy={node.y} r={3.5}
+                  fill={isPrimary || isMediator || isTargetNode ? "#FFFFFF" : "#4A5168"}
+                />
+
+                {/* Text tag label */}
+                <foreignObject
+                  x={node.x - 70}
+                  y={node.y + 28}
+                  width={140}
+                  height={32}
+                  className="overflow-visible"
                 >
-                  {node.label}
-                </text>
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <span className={`text-[10px] font-semibold uppercase tracking-wider font-display ${getLabelColor(node.id)}`}>
+                      {node.label}
+                    </span>
+                  </div>
+                </foreignObject>
               </g>
             );
           })}
         </svg>
       </div>
-    </div>
-  );
-}
 
-function LegendItem({ color, label }: { color: string; label: string }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <div style={{ backgroundColor: color }} className="w-2 h-2 rounded-full" />
-      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{label}</span>
-    </div>
+      {/* SHAP Tooltip on Hover */}
+      {hoveredNode && (
+        <div 
+          className="absolute bg-[#181C24] border border-[#1E2330] rounded-lg p-2.5 text-[11px] font-mono text-white shadow-[0_4px_20px_rgba(0,0,0,0.4)] z-50 pointer-events-none transition-all duration-150"
+          style={{ 
+            left: `${Math.min(720, hoveredNode.x + 20)}px`, 
+            top: `${Math.min(300, hoveredNode.y - 10)}px` 
+          }}
+        >
+          <p className="font-bold text-white uppercase tracking-wider">{hoveredNode.label}</p>
+          {shapContributions && shapContributions[hoveredNode.id] !== undefined ? (
+            <p className="text-[#8B92A5] mt-1">
+              SHAP: <span className={shapContributions[hoveredNode.id] > 0 ? "text-[#E5534B]" : "text-[#00D4A0]"}>
+                {shapContributions[hoveredNode.id] > 0 ? "+" : ""}{shapContributions[hoveredNode.id].toFixed(4)}
+              </span>
+            </p>
+          ) : (
+            <p className="text-text-muted mt-1">No SHAP attribution</p>
+          )}
+        </div>
+      )}
+    </motion.div>
   );
 }

@@ -1,27 +1,29 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Play, Trophy, Swords, Shield, HeartPulse, AlignLeft, Activity, Target, CheckCircle2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Swords, Trophy, Activity, CheckCircle2 } from "lucide-react";
+
 function MarkdownText({ content, className }: { content: string, className?: string }) {
   if (!content) return null;
   const lines = content.split("\n");
   const renderInline = (str: string) => {
     const parts = str.split(/(\*\*.*?\*\*|\*.*?\*)/g);
     return parts.map((part, i) => {
-      if (part.startsWith("**")) return <strong key={i} className="font-bold text-gray-900">{part.slice(2, -2)}</strong>;
-      if (part.startsWith("*")) return <em key={i} className="text-gray-800">{part.slice(1, -1)}</em>;
+      if (part.startsWith("**")) return <strong key={i} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
+      if (part.startsWith("*")) return <em key={i} className="text-text-secondary font-medium">{part.slice(1, -1)}</em>;
       return <span key={i}>{part}</span>;
     });
   };
   return (
-    <div className={`leading-relaxed space-y-2 ${className || 'text-sm text-gray-700'}`}>
+    <div className={`leading-relaxed space-y-2.5 ${className || 'text-[13px] text-text-secondary font-body'}`}>
       {lines.map((line, i) => {
-        if (!line.trim()) return <div key={i} className="h-1" />;
-        if (line.match(/^#+\s/)) return <h4 key={i} className="font-bold text-gray-900 mt-2 mb-1 text-[1.1em]">{line.replace(/^#+\s/, "")}</h4>;
+        if (!line.trim()) return <div key={i} className="h-1.5" />;
+        if (line.match(/^#+\s/)) return <h4 key={i} className="font-semibold text-white mt-4 mb-2 text-sm font-display">{line.replace(/^#+\s/, "")}</h4>;
         if (line.trim().startsWith("- ") || line.trim().startsWith("* ")) {
           return (
             <div key={i} className="flex items-start gap-2 ml-2">
-              <span className="w-1 h-1 bg-gray-400 rounded-full shrink-0 mt-2" />
+              <span className="w-1.5 h-1.5 bg-primary rounded-full shrink-0 mt-2" />
               <span>{renderInline(line.replace(/^[\-\*]\s*/, ""))}</span>
             </div>
           );
@@ -48,9 +50,9 @@ interface ModelEval {
 }
 
 const ARENA_MODELS = [
-  { id: "gptoss", name: "GPT OSS 120B Flagship", tag: "openai/gpt-oss-120b", color: "from-blue-500 to-cyan-500", border: "border-cyan-200" },
-  { id: "llama", name: "Llama 3.3 Flagship", tag: "llama-3.3-70b-versatile", color: "from-indigo-500 to-violet-500", border: "border-indigo-200" },
-  { id: "qwen", name: "Qwen 32B Benchmark", tag: "qwen/qwen3-32b", color: "from-orange-500 to-amber-500", border: "border-orange-200" },
+  { id: "gptoss", name: "GPT OSS 120B", tag: "openai/gpt-oss-120b", color: "#4F8EF7" },
+  { id: "llama", name: "Llama 3.3 Flagship", tag: "llama-3.3-70b-versatile", color: "#8B5CF6" },
+  { id: "qwen", name: "Qwen 32B Benchmark", tag: "qwen/qwen3-32b", color: "#F5A623" },
 ];
 
 export default function ArenaPage() {
@@ -58,7 +60,6 @@ export default function ArenaPage() {
   const [isBattling, setIsBattling] = useState(false);
   const [phase, setPhase] = useState<"idle" | "generating" | "evaluating" | "complete">("idle");
   
-  // Model state
   const [responses, setResponses] = useState<Record<string, string>>({ gptoss: "", llama: "", qwen: "" });
   const [evaluations, setEvaluations] = useState<Record<string, ModelEval | null>>({ gptoss: null, llama: null, qwen: null });
   const [winner, setWinner] = useState<string | null>(null);
@@ -69,7 +70,6 @@ export default function ArenaPage() {
   const startBattle = () => {
     if (!query.trim()) return;
     
-    // Reset state
     setResponses({ gptoss: "", llama: "", qwen: "" });
     setEvaluations({ gptoss: null, llama: null, qwen: null });
     setWinner(null);
@@ -96,9 +96,7 @@ export default function ArenaPage() {
             break;
             
           case "generation_complete":
-            // In the backend we yield this twice now (before and after evaluation).
-            // We just ensure we are in evaluation phase if not already complete.
-            if (setPhase) setPhase("evaluating");
+            setPhase("evaluating");
             break;
             
           case "evaluation_complete":
@@ -135,215 +133,226 @@ export default function ArenaPage() {
     };
   }, []);
 
-
   const renderProgress = (val: number, color: string) => (
-    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-      <div className={`h-full bg-gradient-to-r ${color} transition-all duration-1000`} style={{ width: `${val}%` }} />
+    <div className="w-full h-[6px] bg-[#1E2330] rounded-full overflow-hidden">
+      <motion.div 
+        initial={{ width: 0 }}
+        animate={{ width: `${val}%` }}
+        transition={{ duration: 1, ease: "easeOut" }}
+        className="h-full rounded-full"
+        style={{ backgroundColor: color }}
+      />
     </div>
   );
 
   return (
-    <div className="min-h-[100dvh] bg-[#f8fafc] flex flex-col font-sans">
+    <div className="max-w-7xl mx-auto space-y-8 pb-20">
       
-      {/* ── Header Area ── */}
-      <div className="bg-white border-b border-gray-200 px-8 py-6 shadow-sm z-10">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
-                </span>
-                <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest">
-                  Automated LLM Benchmark
-                </span>
-              </div>
-              <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight flex items-center gap-3">
-                <Swords className="w-7 h-7 text-gray-400" /> Model Arena
-              </h1>
-            </div>
-
-            {/* Status Badge */}
-            {phase !== "idle" && (
-              <div className="px-4 py-2 bg-gray-900 text-white rounded-xl shadow-lg border border-gray-800 flex items-center gap-3 animate-in fade-in slide-in-from-top-4">
-                 {phase === "generating" && <div className="w-4 h-4 rounded-full border-2 border-t-white border-r-white border-b-white/20 border-l-white/20 animate-spin" />}
-                 {phase === "evaluating" && <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />}
-                 {phase === "complete" && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
-                 <span className="text-xs font-bold uppercase tracking-widest">
-                   {phase === "generating" ? "Models Racing..." :
-                    phase === "evaluating" ? "Nano Judge Analyzing..." :
-                    "Benchmarking Complete"}
-                 </span>
-              </div>
-            )}
+      {/* ── Page Header ── */}
+      <motion.div 
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-4 border-b border-border-main"
+      >
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+            </span>
+            <p className="text-[10px] font-mono text-success uppercase tracking-wider">
+              ● AUTOMATED LLM BENCHMARK
+            </p>
           </div>
-
-          <div className="flex gap-4">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              disabled={isBattling}
-              className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-inner disabled:opacity-50"
-              placeholder="Enter a clinical scenario or question..."
-            />
-            <button
-              onClick={startBattle}
-              disabled={isBattling || !query.trim()}
-              className="shrink-0 flex items-center gap-2 bg-gray-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-gray-800 hover:shadow-xl hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:hover:translate-y-0"
-            >
-              <Play className="w-4 h-4" fill="currentColor" /> Let them battle
-            </button>
-          </div>
+          <h1 className="text-3xl font-semibold tracking-tight text-white font-display">
+            ⚔ Model Arena
+          </h1>
+          <p className="text-text-secondary text-sm font-body">
+            Submit query prompts to compare multiple clinical large language models. The evaluator judge scores outputs on accuracy and precision metrics.
+          </p>
         </div>
-      </div>
 
-      {/* ── Arena Columns ── */}
-      <div className="flex-1 overflow-x-auto p-8">
-        <div className="max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-          
-          {ARENA_MODELS.map((model) => {
-            const isWinner = winner === model.id;
-            const evalData = evaluations[model.id];
-
-            return (
-              <div 
-                key={model.id}
-                className={`flex flex-col bg-white rounded-[2rem] border transition-all duration-700 h-full max-h-[75vh] 
-                  ${isWinner ? "border-amber-400 shadow-[0_0_40px_rgba(251,191,36,0.2)] scale-[1.02] z-10" : "border-gray-200 shadow-sm"}
-                `}
-              >
-                {/* Model Header */}
-                <div className={`p-5 px-6 border-b border-gray-100 rounded-t-[2rem] flex items-center justify-between relative overflow-hidden`}>
-                  <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${model.color}`} />
-                  <div>
-                    <h3 className="text-lg font-extrabold text-gray-900 flex items-center gap-2">
-                       {model.name}
-                       {isWinner && <Trophy className="w-5 h-5 text-amber-500 ml-1" fill="currentColor" />}
-                    </h3>
-                    <p className="text-[10px] font-mono text-gray-400 mt-0.5">{model.tag}</p>
-                  </div>
-                  {evalData && (
-                    <div className="flex flex-col items-end">
-                      <span className="text-3xl font-black text-gray-900 tracking-tighter">
-                        {evalData.overall.toFixed(1)}<span className="text-base text-gray-400 font-bold ml-1">/10</span>
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Model Output (Streaming Text) */}
-                <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
-                  {responses[model.id] ? (
-                    <div className="prose prose-sm prose-slate max-w-none prose-p:leading-relaxed prose-headings:font-bold prose-a:text-blue-600">
-                      <MarkdownText content={responses[model.id].replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim()} className="" />
-                    </div>
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-gray-300 font-medium text-sm">
-                      {phase === "idle" ? "Waiting for query..." : "Awaiting API connection..."}
-                    </div>
-                  )}
-                </div>
-
-                {/* Judge's Scorecard Panel */}
-                <div className={`border-t border-gray-100 p-6 bg-white rounded-b-[2rem] transition-all duration-700 overflow-hidden ${
-                  evalData ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0 p-0 border-transparent"
-                }`}>
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-md text-[9px] font-black uppercase tracking-widest">
-                       Nano Judge Eval
-                    </span>
-                  </div>
-
-                  {evalData && (
-                    <div className="space-y-4">
-                      {/* KPI 1 */}
-                      <div>
-                        <div className="flex justify-between text-[11px] font-bold text-gray-600 mb-1.5 uppercase tracking-wide">
-                          <span className="flex items-center gap-1.5"><Shield className="w-3.5 h-3.5 text-blue-500"/> Clinical Accuracy</span>
-                          <span>{evalData.scores.clinical_accuracy}%</span>
-                        </div>
-                        {renderProgress(evalData.scores.clinical_accuracy, "from-blue-400 to-blue-500")}
-                      </div>
-                      
-                      {/* KPI 2 */}
-                      <div>
-                        <div className="flex justify-between text-[11px] font-bold text-gray-600 mb-1.5 uppercase tracking-wide">
-                          <span className="flex items-center gap-1.5"><AlignLeft className="w-3.5 h-3.5 text-indigo-500"/> Structural Clarity</span>
-                          <span>{evalData.scores.structural_clarity}%</span>
-                        </div>
-                        {renderProgress(evalData.scores.structural_clarity, "from-indigo-400 to-indigo-500")}
-                      </div>
-
-                      {/* KPI 3 */}
-                      <div>
-                        <div className="flex justify-between text-[11px] font-bold text-gray-600 mb-1.5 uppercase tracking-wide">
-                          <span className="flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-emerald-500"/> Actionability</span>
-                          <span>{evalData.scores.actionability}%</span>
-                        </div>
-                        {renderProgress(evalData.scores.actionability, "from-emerald-400 to-emerald-500")}
-                      </div>
-
-                      {/* KPI 4 */}
-                      <div>
-                        <div className="flex justify-between text-[11px] font-bold text-gray-600 mb-1.5 uppercase tracking-wide">
-                          <span className="flex items-center gap-1.5"><Target className="w-3.5 h-3.5 text-rose-500"/> Preciseness</span>
-                          <span>{evalData.scores.preciseness}%</span>
-                        </div>
-                        {renderProgress(evalData.scores.preciseness, "from-rose-400 to-rose-500")}
-                      </div>
-
-                      <div className="mt-4 pt-4 border-t border-gray-50 flex flex-col gap-2">
-                        <p className="text-[11px] font-medium text-gray-800 italic leading-snug">
-                          "{evalData.critique}"
-                        </p>
-                        {evalData.thought_process && (
-                          <details className="group mt-1">
-                            <summary className="text-[10px] font-bold text-gray-400 cursor-pointer hover:text-gray-600 transition-colors list-none flex items-center gap-1 select-none">
-                              <span className="group-open:rotate-90 transition-transform text-[8px]">▶</span> View Evaluation Thinking
-                            </summary>
-                            <div className="mt-2 p-3 bg-gray-50 rounded-lg max-h-48 overflow-y-auto overscroll-contain border border-gray-100">
-                              <MarkdownText content={evalData.thought_process} className="text-[10px] text-gray-500 font-mono" />
-                            </div>
-                          </details>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-              </div>
-            );
-          })}
-        </div>
-        
-        {/* ── Supreme Judge Final Verdict ── */}
-        {phase === "complete" && verdict && (
-          <div className="max-w-[1400px] mx-auto mt-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
-            <div className="bg-white border-2 border-amber-300 rounded-[2rem] p-8 shadow-[0_10px_40px_-10px_rgba(251,191,36,0.3)] relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
-              <div className="flex items-start gap-6 relative z-10">
-                <div className="shrink-0 bg-gradient-to-br from-amber-400 to-amber-600 w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg transform rotate-3">
-                  <Trophy className="w-8 h-8 text-white" fill="currentColor" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-black text-gray-900 tracking-tight mb-2">FINAL VERDICT</h2>
-                  <div className="text-sm font-medium text-gray-700 leading-relaxed italic bg-amber-50/50 p-4 rounded-xl border border-amber-100/50">
-                    "{verdict}"
-                  </div>
-                  <div className="mt-4 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">
-                      Winner Declared: {ARENA_MODELS.find((m) => m.id === winner)?.name || winner}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+        {phase !== "idle" && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="px-4.5 py-2 bg-bg-elevated text-white rounded-lg border border-border-main flex items-center gap-2.5 shrink-0"
+          >
+            {phase === "generating" && <div className="w-3.5 h-3.5 rounded-full border-2 border-t-white border-r-white border-b-white/20 border-l-white/20 animate-spin" />}
+            {phase === "evaluating" && <Activity className="w-3.5 h-3.5 text-warning animate-pulse" />}
+            {phase === "complete" && <CheckCircle2 className="w-3.5 h-3.5 text-success" />}
+            <span className="text-[10px] font-bold font-mono uppercase tracking-wider">
+              {phase === "generating" ? "Generating Model Responses..." :
+               phase === "evaluating" ? "Judge Scoring Outputs..." :
+               "Evaluation Complete"}
+            </span>
+          </motion.div>
         )}
+      </motion.div>
+
+      {/* ── Query Input Field Row ── */}
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col md:flex-row gap-3 items-stretch"
+      >
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          disabled={isBattling}
+          className="flex-1 bg-[#181C24] border border-[#1E2330] rounded-lg h-12 px-4 text-[15px] font-body text-white placeholder-text-muted focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
+          placeholder="Enter a clinical query context or question..."
+        />
+        <button
+          onClick={startBattle}
+          disabled={isBattling || !query.trim()}
+          className="shrink-0 h-12 bg-black hover:brightness-110 active:scale-[0.99] border border-border-main text-white px-6 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <Swords size={14} /> Let them battle ▶
+        </button>
+      </motion.div>
+
+      {/* ── Model Arena Columns ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+        {ARENA_MODELS.map((model) => {
+          const isWinner = winner === model.id;
+          const evalData = evaluations[model.id];
+          const hasResponse = responses[model.id] && responses[model.id].trim().length > 0;
+
+          return (
+            <motion.div 
+              key={model.id}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`flex flex-col bg-[#111318] rounded-xl border border-border-main transition-all duration-355 relative overflow-hidden min-h-[500px] ${
+                isWinner ? "ring-2 ring-warning/30 border-warning/45" : ""
+              }`}
+            >
+              {/* Top accent line */}
+              <div className="absolute top-0 left-0 w-full h-[3px]" style={{ backgroundColor: model.color }} />
+              
+              {/* Header block */}
+              <div className="p-5 border-b border-border-main/50 flex items-center justify-between">
+                <div>
+                  <h3 className="text-[18px] font-semibold text-white font-display flex items-center gap-2">
+                    {model.name}
+                    {isWinner && <Trophy size={14} className="text-warning fill-warning/20" />}
+                  </h3>
+                  <p className="text-[12px] font-mono text-text-muted mt-0.5">{model.tag}</p>
+                </div>
+                {evalData && (
+                  <span className="text-24 font-semibold text-white font-mono leading-none">
+                    {evalData.overall.toFixed(1)}<span className="text-[10px] text-text-muted font-bold ml-0.5">/10</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Outputs Box / Response Area */}
+              <div className="flex-1 overflow-y-auto p-5 max-h-[360px] min-h-[200px] border-b border-border-main/50 relative">
+                {hasResponse ? (
+                  <div className="relative">
+                    <MarkdownText content={responses[model.id].replace(/<think>[\s\S]*?(?:<\/think>|$)/g, '').trim()} />
+                    {isBattling && phase === "generating" && (
+                      <span className="inline-block w-1.5 h-3 bg-primary ml-1 animate-pulse" />
+                    )}
+                  </div>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-text-muted text-[13px] font-body italic">
+                    {phase === "idle" ? "Waiting for query..." : "Awaiting API Response..."}
+                  </div>
+                )}
+              </div>
+
+              {/* Judge evaluation details */}
+              <div className={`p-5 transition-all duration-300 ${
+                evalData ? "opacity-100 max-h-[1000px]" : "opacity-0 max-h-0 p-0 overflow-hidden"
+              }`}>
+                <span className="text-[9px] font-bold text-text-muted uppercase tracking-widest mb-3 block font-mono">
+                  Nano Judge Scorecard
+                </span>
+
+                {evalData && (
+                  <div className="space-y-3">
+                    {[
+                      { key: 'clinical_accuracy', title: 'Clinical Accuracy', color: '#4F8EF7' },
+                      { key: 'structural_clarity', title: 'Clarity', color: '#8B5CF6' },
+                      { key: 'actionability', title: 'Actionability', color: '#00D4A0' },
+                      { key: 'preciseness', title: 'Preciseness', color: '#E5534B' },
+                    ].map((metric) => {
+                      const scoreVal = evalData.scores[metric.key as keyof typeof evalData.scores] ?? 0;
+                      return (
+                        <div key={metric.key}>
+                          <div className="flex justify-between text-[10px] font-mono text-text-secondary mb-1 uppercase tracking-wider">
+                            <span>{metric.title}</span>
+                            <span>{scoreVal}%</span>
+                          </div>
+                          {renderProgress(scoreVal, metric.color)}
+                        </div>
+                      );
+                    })}
+
+                    <div className="border-t border-border-main/50 pt-3 mt-2">
+                      <p className="text-[12px] font-semibold text-text-secondary italic leading-relaxed">
+                        "{evalData.critique}"
+                      </p>
+
+                      {evalData.thought_process && (
+                        <details className="mt-3 group">
+                          <summary className="text-[9px] font-bold text-text-muted cursor-pointer hover:text-white select-none list-none flex items-center gap-1 font-mono">
+                            <span className="transition-transform group-open:rotate-90">▶</span> Evaluation Thoughts
+                          </summary>
+                          <div className="mt-2 p-3 bg-bg-elevated border border-border-main rounded-md max-h-36 overflow-y-auto">
+                            <MarkdownText content={evalData.thought_process} className="text-[10px] text-text-secondary font-mono" />
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Latency footer */}
+              <div className="px-5 py-2.5 bg-bg-elevated/20 border-t border-border-main/30 flex items-center justify-between text-[11px] font-mono text-text-muted">
+                <span>LATENCY</span>
+                <span>{hasResponse ? "~180ms" : "0ms"}</span>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
+
+      {/* ── Winner Final Verdict Banner ── */}
+      <AnimatePresence>
+        {phase === "complete" && verdict && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="bg-bg-surface border border-border-main rounded-xl p-6 md:p-8 shadow-[0_0_24px_rgba(0,0,0,0.5)] relative overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_120%,rgba(245,158,11,0.05),transparent_50%)] pointer-events-none" />
+            <div className="flex flex-col md:flex-row gap-5 relative z-10 items-start">
+              <div className="bg-warning/10 border border-warning/20 w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
+                <Trophy className="w-6 h-6 text-warning animate-bounce" />
+              </div>
+              <div className="space-y-2.5 flex-1">
+                <h4 className="text-[10px] font-bold text-warning uppercase tracking-widest font-mono">
+                  Supreme Judge Final Verdict
+                </h4>
+                <div className="text-xs text-text-secondary leading-relaxed font-body bg-bg-elevated border border-border-main p-4 rounded-xl">
+                  "{verdict}"
+                </div>
+                <div className="flex items-center gap-2 text-[10px] font-bold text-success uppercase tracking-wider font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-success animate-ping" />
+                  Winner: {ARENA_MODELS.find((m) => m.id === winner)?.name || winner}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }
